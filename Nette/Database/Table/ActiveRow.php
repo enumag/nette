@@ -137,6 +137,31 @@ class ActiveRow extends Nette\Object implements \IteratorAggregate, \ArrayAccess
 
 
 	/**
+	 * Returns referenced rows of M:N relation.
+	 * @param  string
+	 * @param  string
+	 * @param  string
+	 * @param  string
+	 * @return GroupedManySelection
+	 */
+	public function relatedMany($joinTable, $joinColumnSource = NULL, $targetTable = NULL, $joinColumnTarget = NULL)
+	{
+		if (strpos($joinTable, ':') !== FALSE) {
+			list($joinTable, $joinColumnSource) = explode(':', $joinTable);
+		}
+
+		if (func_num_args() <= 2) { // join table + target table
+			$targetTable = $joinColumnSource; // move arg
+			list (, $joinColumnSource) = $this->table->getConnection()->getDatabaseReflection()->getHasManyReference($this->table->getName(), $joinTable);
+			list (, $joinColumnTarget) = $this->table->getConnection()->getDatabaseReflection()->getHasManyReference($targetTable, $joinTable);
+		}
+
+		return $this->table->getReferencedMany($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $this[$this->table->getPrimary()]);
+	}
+
+
+
+	/**
 	 * Updates row.
 	 * @param  array or NULL for all modified values
 	 * @return int number of affected rows or FALSE in case of an error
