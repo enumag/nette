@@ -47,7 +47,11 @@ $connection->table('book')->get(1)->relatedMany('book_tag', 'tag')->insert(array
 
 $connection->table('tag')->get(23)->related('book_tag_alt')->delete(); // prevent integrity constraint violation
 
-$connection->table('book')->get(2)->relatedMany('book_tag', 'tag')->delete(); // DELETE FROM `book_tag` WHERE (`book_id` = 2) AND (`tag_id` IN (23)); DELETE FROM `tag` WHERE (`tag`.`id` IN (23))
+$delete = $connection->table('book')->get(2)->relatedMany('book_tag', 'tag')->delete(); // DELETE FROM `book_tag` WHERE (`book_id` = 2) AND (`tag_id` IN (23)); DELETE FROM `tag` WHERE (`id` IN (23))
+
+Assert::same(1, $delete);
+
+
 
 $tags1 = array();
 

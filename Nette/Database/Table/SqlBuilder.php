@@ -264,7 +264,7 @@ class SqlBuilder extends Nette\Object
 		$join = $this->buildJoins(implode(',', $this->conditions), TRUE);
 		$join += $this->buildJoins(implode(',', $this->select) . ",{$this->group},{$this->having}," . implode(',', $this->order));
 
-		$prefix = $join ? "{$this->delimitedTable}." : '';
+		$prefix = $join ? "$this->delimitedTable." : '';
 		if ($this->select) {
 			$cols = $this->tryDelimite($this->removeExtraTables(implode(', ', $this->select)));
 

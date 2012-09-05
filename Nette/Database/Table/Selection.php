@@ -147,6 +147,16 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 
 	/**
+	 * @return array
+	 */
+	public function getKeys()
+	{
+		return $this->keys;
+	}
+
+
+
+	/**
 	 * Loads cache of previous accessed columns and returns it
 	 * @internal
 	 * @return array|false
@@ -474,9 +484,9 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 
 
-	protected function createGroupedManySelectionInstance($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $mapping)
+	protected function createGroupedManySelectionInstance($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget)
 	{
-		return new GroupedManySelection($this, $joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $mapping);
+		return new GroupedManySelection($this, $joinTable, $joinColumnSource, $targetTable, $joinColumnTarget);
 	}
 
 
@@ -706,15 +716,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	{
 		$prototype = & $this->getRefTable($refPath)->referencingPrototype[$refPath . "$joinTable.$joinColumnSource.$targetTable.$joinColumnTarget"];
 		if (!$prototype) {
-			$join = $this->connection->table($joinTable)->where("$joinTable.$joinColumnSource", array_keys((array) $this->rows));
-
-			$mapping = array();
-			foreach($join as $row) {
-				$mapping[$row->$joinColumnTarget][] = $row->$joinColumnSource;
-			}
-
-			$prototype = $this->createGroupedManySelectionInstance($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $mapping);
-			$prototype->where("$targetTable.{$prototype->primary}", array_keys($mapping));
+			$prototype = $this->createGroupedManySelectionInstance($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget);
 		}
 
 		$clone = clone $prototype;

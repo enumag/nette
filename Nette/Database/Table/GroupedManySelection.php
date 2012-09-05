@@ -23,6 +23,8 @@ use Nette;
  */
 class GroupedManySelection extends AbstractGroupedSelection
 {
+	const SOURCE_COLUMN = '_nette_relation_source';
+
 	/** @var array targetId -> sourceId[] */
 	protected $mapping;
 
@@ -46,10 +48,9 @@ class GroupedManySelection extends AbstractGroupedSelection
 	 * @param  string
 	 * @param  array
 	 */
-	public function __construct(Selection $refTable, $joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, array $mapping)
+	public function __construct(Selection $refTable, $joinTable, $joinColumnSource, $targetTable, $joinColumnTarget)
 	{
 		parent::__construct($refTable, $targetTable);
-		$this->mapping = $mapping;
 		$this->joinTable = $joinTable;
 		$this->joinColumnSource = $joinColumnSource;
 		$this->joinColumnTarget = $joinColumnTarget;
@@ -63,12 +64,50 @@ class GroupedManySelection extends AbstractGroupedSelection
 
 	protected function calculateAggregation($function)
 	{
-		throw new \Nette\NotImplementedException;
+		$selection = $this->createSelectionInstance();
+		$selection->getSqlBuilder()->importConditions($this->getSqlBuilder());
+		$selection->select($function);
+		$selection->select("$this->joinTable:$this->joinColumnSource AS " . self::SOURCE_COLUMN);
+		$selection->group("$this->joinTable:$this->joinColumnSource");
+		$selection->where("$this->joinTable:$this->joinColumnSource", $this->refTable->getKeys() ?: array($this->active));
+
+		$aggregation = array();
+		foreach ($selection as $row) {
+			$aggregation[$row[self::SOURCE_COLUMN]] = $row;
+		}
+		return $aggregation;
 	}
 
 
 
 	/********************* internal ****************d*g**/
+
+
+
+	protected function relatedKeys() {
+		$active = $this->active;
+		// TODO: 5.2 compatibility
+		return array_keys(array_filter($this->mapping, function ($sourceKeys) use ($active) {
+			return in_array($active, $sourceKeys);
+		}));
+	}
+
+
+
+	protected function execute()
+	{
+		$builder = clone $this->sqlBuilder;
+		$this->where("$this->joinTable:$this->joinColumnSource", $this->refTable->getKeys() ?: array($this->active));
+
+		// TODO: nerespektuje getPreviousAccessed
+		if (!$this->sqlBuilder->getSelect()) {
+			$this->sqlBuilder->addSelect("$this->name.*");
+		}
+		$this->sqlBuilder->addSelect("$this->joinTable:$this->joinColumnSource AS " . self::SOURCE_COLUMN);
+
+		parent::execute();
+		$this->sqlBuilder = $builder;
+	}
 
 
 
@@ -78,10 +117,10 @@ class GroupedManySelection extends AbstractGroupedSelection
 
 		$offset = array();
 		foreach ($rows as $key => $row) {
-			$iid = $row[$this->primary];
-			foreach ($this->mapping[$iid] as $targetId) {
-				$ref = & $output[$targetId];
-				$skip = & $offset[$targetId];
+			$id = $row[$this->primary];
+			foreach ($this->mapping[$id] as $sourceId) {
+				$ref = & $output[$sourceId];
+				$skip = & $offset[$sourceId];
 				if ($limit === NULL || $rows <= 1 || (count($ref) < $limit && $skip >= $this->sqlBuilder->getOffset())) {
 					$ref[$key] = $row;
 				} else {
@@ -95,6 +134,17 @@ class GroupedManySelection extends AbstractGroupedSelection
 
 
 
+	protected function createRow(array $row)
+	{
+		// TODO: nemělo createRow by sloužit jen jako továrna?
+		if (isset($row[$this->primary])) {
+			$this->mapping[$row[$this->primary]][] = isset($row[self::SOURCE_COLUMN]) ? $row[self::SOURCE_COLUMN] : $this->active;
+		}
+		return parent::createRow($row);
+	}
+
+
+
 	/********************* manipulation ****************d*g**/
 
 
@@ -103,9 +153,10 @@ class GroupedManySelection extends AbstractGroupedSelection
 	{
 		$return = parent::insert($data);
 
-		$rows = $this->connection->table($this->name)->select($this->primary)->where($this->primary . ' >= ?', $this->connection->lastInsertId());
+		$selection = $this->createSelectionInstance();
+		$selection->select($this->primary)->where($this->primary . ' >= ?', $this->connection->lastInsertId())->rewind();
 		$insert = array();
-		foreach ($rows as $id => $_) {
+		foreach ($selection->getKeys() as $id) {
 			$insert[] = array($this->joinColumnSource => $this->active, $this->joinColumnTarget => $id);
 		}
 		$this->connection->table($this->joinTable)->insert($insert);
@@ -115,16 +166,37 @@ class GroupedManySelection extends AbstractGroupedSelection
 
 
 
+	public function update($data)
+	{
+		$this->execute();
+		$builder = $this->sqlBuilder;
+
+		$this->sqlBuilder = new SqlBuilder($this);
+		$this->where($this->primary, $this->relatedKeys());
+		$return = parent::update($data);
+
+		$this->sqlBuilder = $builder;
+		return $return;
+	}
+
+
+
 	public function delete()
 	{
-		$this->rewind();
-
+		$this->execute();
 		$this->connection->table($this->joinTable)
 			->where($this->joinColumnSource, $this->active)
-			->where($this->joinColumnTarget, $this->keys)
+			->where($this->joinColumnTarget, array_keys($this->mapping))
 			->delete();
 
-		return parent::delete();
+		$builder = $this->sqlBuilder;
+
+		$this->sqlBuilder = new SqlBuilder($this);
+		$this->where($this->primary, $this->relatedKeys());
+		$return = parent::delete();
+
+		$this->sqlBuilder = $builder;
+		return $return;
 	}
 
 }
