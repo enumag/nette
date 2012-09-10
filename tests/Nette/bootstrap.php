@@ -17,11 +17,22 @@ error_reporting(E_ALL | E_STRICT);
 ini_set('display_errors', TRUE);
 ini_set('html_errors', FALSE);
 ini_set('log_errors', FALSE);
+date_default_timezone_set('Europe/Prague');
 
+
+// temporary directory garbage collection
+if (mt_rand() / mt_getrandmax() < 0.01) {
+	foreach (glob(__DIR__ . '/../tmp/*', GLOB_ONLYDIR) as $dir) {
+		if (time() - @filemtime($dir) > 300) {
+			try { TestHelpers::purge($dir); } catch (Exception $e) {}
+			@rmdir($dir);
+		}
+	}
+}
 
 // create temporary directory
 define('TEMP_DIR', __DIR__ . '/../tmp/' . getmypid());
-@mkdir(TEMP_DIR, 0777, TRUE);
+TestHelpers::purge(TEMP_DIR);
 
 
 // catch unexpected errors/warnings/notices
@@ -35,7 +46,7 @@ set_error_handler(function($severity, $message, $file, $line) {
 });
 
 
-$_SERVER = array_intersect_key($_SERVER, array_flip(array('PHP_SELF', 'SCRIPT_NAME', 'SERVER_ADDR', 'SERVER_SOFTWARE', 'HTTP_HOST', 'DOCUMENT_ROOT', 'OS')));
+$_SERVER = array_intersect_key($_SERVER, array_flip(array('PHP_SELF', 'SCRIPT_NAME', 'SERVER_ADDR', 'SERVER_SOFTWARE', 'HTTP_HOST', 'DOCUMENT_ROOT', 'OS', 'argc', 'argv')));
 $_SERVER['REQUEST_TIME'] = 1234567890;
 $_ENV = $_GET = $_POST = array();
 

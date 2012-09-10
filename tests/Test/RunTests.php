@@ -17,7 +17,6 @@ Options:
 	-c <path>   Look for php.ini in directory <path> or use <path> as php.ini.
 	-log <path> Write log to file <path>.
 	-d key=val  Define INI entry 'key' with value 'val'.
-	-l <path>   Specify path to shared library files (LD_LIBRARY_PATH).
 	-s          Show information about skipped tests.
 	-j <num>    Run <num> jobs in parallel.
 
@@ -28,13 +27,18 @@ Options:
 }
 
 
+// throw unexpected errors/warnings/notices
+set_error_handler(function($severity, $message, $file, $line) {
+	if (($severity & error_reporting()) === $severity) {
+		throw new \ErrorException($message, 0, $severity, $file, $line);
+	}
+	return FALSE;
+});
 
-/**
- * Execute tests
- */
+
+// Execute tests
 try {
 	@unlink(__DIR__ . '/coverage.dat'); // @ - file may not exist
-
 
 	$manager = new TestRunner;
 	$manager->parseArguments();

@@ -31,6 +31,9 @@ class TestCase
 	/** @var string  test file */
 	private $file;
 
+	/** @var string  test arguments */
+	private $args;
+
 	/** @var array  */
 	private $options;
 
@@ -68,9 +71,10 @@ class TestCase
 	 * @param  string  PHP-CGI command line
 	 * @return void
 	 */
-	public function __construct($testFile)
+	public function __construct($testFile, $args = NULL)
 	{
 		$this->file = (string) $testFile;
+		$this->args = $args;
 		$this->options = self::parseOptions($this->file);
 	}
 
@@ -109,16 +113,15 @@ class TestCase
 	 * Sets PHP command line.
 	 * @param  string
 	 * @param  string
-	 * @param  string
 	 * @return TestCase  provides a fluent interface
 	 */
-	public function setPhp($binary, $args, $environment)
+	public function setPhp($binary, $args)
 	{
 		if (isset(self::$cachedPhp[$binary])) {
 			list($this->phpVersion, $this->phpType) = self::$cachedPhp[$binary];
 
 		} else {
-			exec($environment . escapeshellarg($binary) . ' -v', $output, $res);
+			exec(escapeshellarg($binary) . ' -v', $output, $res);
 			if ($res !== self::CODE_OK && $res !== self::CODE_ERROR) {
 				throw new Exception("Unable to execute '$binary -v'.");
 			}
@@ -132,7 +135,7 @@ class TestCase
 			self::$cachedPhp[$binary] = array($this->phpVersion, $this->phpType);
 		}
 
-		$this->cmdLine = $environment . escapeshellarg($binary) . $args;
+		$this->cmdLine = escapeshellarg($binary) . $args;
 		return $this;
 	}
 
@@ -152,7 +155,7 @@ class TestCase
 				$this->cmdLine .= " -d " . escapeshellarg(trim($item));
 			}
 		}
-		$this->cmdLine .= ' ' . escapeshellarg($this->file);
+		$this->cmdLine .= ' ' . escapeshellarg($this->file) . ' ' . $this->args;
 
 		$descriptors = array(
 			array('pipe', 'r'),
@@ -238,12 +241,34 @@ class TestCase
 
 
 	/**
+	 * Returns test file path.
+	 * @return string
+	 */
+	public function getFile()
+	{
+		return $this->file;
+	}
+
+
+
+	/**
 	 * Returns test name.
 	 * @return string
 	 */
 	public function getName()
 	{
 		return $this->options['name'];
+	}
+
+
+
+	/**
+	 * Returns test args.
+	 * @return string
+	 */
+	public function getArguments()
+	{
+		return $this->args;
 	}
 
 

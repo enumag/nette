@@ -476,6 +476,10 @@ final class Debugger
 		}
 
 		if ($severity === E_RECOVERABLE_ERROR || $severity === E_USER_ERROR) {
+			if (Helpers::findTrace(/*5.2*PHP_VERSION_ID < 50205 ? debug_backtrace() : */debug_backtrace(FALSE), '*::__toString')) {
+				$previous = isset($context['e']) && $context['e'] instanceof \Exception ? $context['e'] : NULL;
+				self::_exceptionHandler(new Nette\FatalErrorException($message, 0, $severity, $file, $line, $context, $previous));
+			}
 			throw new Nette\FatalErrorException($message, 0, $severity, $file, $line, $context);
 
 		} elseif (($severity & error_reporting()) !== $severity) {
@@ -520,11 +524,7 @@ final class Debugger
 
 
 
-	/**
-	 * Handles exception thrown in __toString().
-	 * @param  \Exception
-	 * @return void
-	 */
+	/** @deprecated */
 	public static function toStringException(\Exception $exception)
 	{
 		if (self::$enabled) {
@@ -536,12 +536,10 @@ final class Debugger
 
 
 
-	/**
-	 * Starts catching potential errors/warnings.
-	 * @return void
-	 */
+	/** @deprecated */
 	public static function tryError()
 	{
+		trigger_error(__METHOD__ . '() is deprecated; use own error handler instead.', E_USER_DEPRECATED);
 		if (!self::$enabled && self::$lastError === FALSE) {
 			set_error_handler(array(__CLASS__, '_errorHandler'));
 		}
@@ -550,13 +548,10 @@ final class Debugger
 
 
 
-	/**
-	 * Returns catched error/warning message.
-	 * @param  \ErrorException  catched error
-	 * @return bool
-	 */
+	/** @deprecated */
 	public static function catchError(& $error)
 	{
+		trigger_error(__METHOD__ . '() is deprecated; use own error handler instead.', E_USER_DEPRECATED);
 		if (!self::$enabled && self::$lastError !== FALSE) {
 			restore_error_handler();
 		}

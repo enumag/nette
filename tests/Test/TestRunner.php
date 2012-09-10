@@ -38,9 +38,6 @@ class TestRunner
 	/** @var string  php-cgi command-line arguments */
 	private $phpArgs;
 
-	/** @var string  php-cgi environment variables */
-	private $phpEnvironment;
-
 	/** @var bool  display skipped tests information? */
 	private $displaySkipped = FALSE;
 
@@ -58,7 +55,7 @@ class TestRunner
 		$count = 0;
 		$failed = $passed = $skipped = array();
 
-		exec($this->phpEnvironment . escapeshellarg($this->phpBinary) . ' -v', $output);
+		exec(escapeshellarg($this->phpBinary) . ' -v', $output);
 		if (!isset($output[0])) {
 			return FALSE;
 
@@ -66,7 +63,7 @@ class TestRunner
 			echo "Nette Framework Tests suite requires php-cgi, " . $this->phpBinary . " given.\n\n";
 			return FALSE;
 		}
-		echo "$output[0] | $this->phpBinary $this->phpArgs $this->phpEnvironment\n\n";
+		echo $this->log("$output[0] | $this->phpBinary $this->phpArgs\n");
 
 		$tests = array();
 		foreach ($this->paths as $path) {
@@ -75,52 +72,73 @@ class TestRunner
 			} else {
 				$files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path));
 			}
-			foreach ($files as $entry) {
-				$entry = (string) $entry;
-				$info = pathinfo($entry);
+			foreach ($files as $file) {
+				$file = (string) $file;
+				$info = pathinfo($file);
 				if (!isset($info['extension']) || $info['extension'] !== 'phpt') {
 					continue;
 				}
-				$tests[] = $entry;
+
+				$options = TestCase::parseOptions($file);
+				if (!empty($options['multiple'])) {
+					if (is_numeric($options['multiple'])) {
+						$range = range(0, $options['multiple'] - 1);
+
+					} elseif (!is_file($multiFile = dirname($file) . '/' . $options['multiple'])) {
+						throw new Exception("Missing @multiple configuration file '$multiFile'.");
+
+					} elseif (($multiple = parse_ini_file($multiFile, TRUE)) === FALSE) {
+						throw new Exception("Cannot parse @multiple configuration file '$multiFile'.");
+
+					} else {
+						$range = array_keys($multiple);
+					}
+					foreach ($range as $item) {
+						$tests[] = array($file, escapeshellarg($item));
+					}
+
+				} else {
+					$tests[] = array($file, NULL);
+				}
 			}
 		}
 
 		$running = array();
 		while ($tests || $running) {
 			for ($i = count($running); $tests && $i < $this->jobs; $i++) {
-				$entry = array_shift($tests);
+				list($file, $args) = array_shift($tests);
 				$count++;
-				$testCase = new TestCase($entry);
-				$testCase->setPhp($this->phpBinary, $this->phpArgs, $this->phpEnvironment);
+				$testCase = new TestCase($file, $args);
+				$testCase->setPhp($this->phpBinary, $this->phpArgs);
 				try {
 					$parallel = ($this->jobs > 1) && (count($running) + count($tests) > 1);
-					$running[$entry] = $testCase->run(!$parallel);
+					$running[] = $testCase->run(!$parallel);
 				} catch (TestCaseException $e) {
-					$this->out('s');
-					$skipped[] = array($testCase->getName(), $entry, $e->getMessage());
+					echo 's';
+					$skipped[] = $this->log($this->format('Skipped', $testCase, $e));
 				}
 			}
 			if (count($running) > 1) {
 				usleep(self::RUN_USLEEP); // stream_select() doesn't work with proc_open()
 			}
-			foreach ($running as $entry => $testCase) {
+			foreach ($running as $key => $testCase) {
 				if ($testCase->isReady()) {
 					try {
 						$testCase->collect();
-						$this->out('.');
-						$passed[] = array($testCase->getName(), $entry);
+						echo '.';
+						$passed[] = array($testCase->getName(), $testCase->getFile());
 
 					} catch (TestCaseException $e) {
 						if ($e->getCode() === TestCaseException::SKIPPED) {
-							$this->out('s');
-							$skipped[] = array($testCase->getName(), $entry, $e->getMessage());
+							echo 's';
+							$skipped[] = $this->log($this->format('Skipped', $testCase, $e));
 
 						} else {
-							$this->out('F');
-							$failed[] = array($testCase->getName(), $entry, $e->getMessage());
+							echo 'F';
+							$failed[] = $this->log($this->format('FAILED', $testCase, $e));
 						}
 					}
-					unset($running[$entry]);
+					unset($running[$key]);
 				}
 			}
 		}
@@ -128,28 +146,20 @@ class TestRunner
 		$failedCount = count($failed);
 		$skippedCount = count($skipped);
 
-		if ($this->displaySkipped && $skippedCount) {
-			$this->out("\n\nSkipped:\n");
-			foreach ($skipped as $i => $item) {
-				list($name, $file, $message) = $item;
-				$this->out("\n" . ($i + 1) . ") $name\n   $message\n   $file\n");
-			}
+		if ($this->displaySkipped) {
+			echo "\n", implode($skipped);
 		}
 
 		if (!$count) {
-			$this->out("No tests found\n");
+			echo $this->log("No tests found\n");
 
 		} elseif ($failedCount) {
-			$this->out("\n\nFailures:\n");
-			foreach ($failed as $item) {
-				list($name, $file, $message) = $item;
-				$this->out("\n-> $name\n   file: $file\n   $message\n");
-			}
-			$this->out("\nFAILURES! ($count tests, $failedCount failures, $skippedCount skipped)\n");
+			echo "\n", implode($failed);
+			echo $this->log("\nFAILURES! ($count tests, $failedCount failures, $skippedCount skipped)");
 			return FALSE;
 
 		} else {
-			$this->out("\n\nOK ($count tests, $skippedCount skipped)\n");
+			echo $this->log("\n\nOK ($count tests, $skippedCount skipped)");
 		}
 		return TRUE;
 	}
@@ -164,8 +174,8 @@ class TestRunner
 	{
 		$this->phpBinary = 'php-cgi';
 		$this->phpArgs = '';
-		$this->phpEnvironment = '';
 		$this->paths = array();
+		$iniSet = FALSE;
 
 		$args = new ArrayIterator(array_slice(isset($_SERVER['argv']) ? $_SERVER['argv'] : array(), 1));
 		foreach ($args as $arg) {
@@ -184,16 +194,20 @@ class TestRunner
 				case 'log':
 					$args->next();
 					$this->logFile = fopen($file = $args->current(), 'w');
-					$this->out("Log: $file\n");
+					echo "Log: $file\n";
 					break;
 				case 'c':
+					$args->next();
+					$path = realpath($args->current());
+					if ($path === FALSE) {
+						throw new Exception("PHP configuration file '{$args->current()}' not found.");
+					}
+					$this->phpArgs .= " -c " . escapeshellarg($path);
+					$iniSet = TRUE;
+					break;
 				case 'd':
 					$args->next();
-					$this->phpArgs .= " -$arg[1] " . escapeshellarg($args->current());
-					break;
-				case 'l':
-					$args->next();
-					$this->phpEnvironment .= 'LD_LIBRARY_PATH='. escapeshellarg($args->current()) . ' ';
+					$this->phpArgs .= " -d " . escapeshellarg($args->current());
 					break;
 				case 's':
 					$this->displaySkipped = TRUE;
@@ -211,20 +225,36 @@ class TestRunner
 		if (!$this->paths) {
 			$this->paths[] = getcwd(); // current directory
 		}
+		if (!$iniSet) {
+			$this->phpArgs .= " -n";
+		}
 	}
 
 
 
 	/**
-	 * Writes to display and log
-	 * @return void
+	 * Writes to log
+	 * @return string
 	 */
-	private function out($s)
+	private function log($s)
 	{
-		echo $s;
 		if ($this->logFile) {
-			fputs($this->logFile, $s);
+			fputs($this->logFile, "$s\n");
 		}
+		return "$s\n";
+	}
+
+
+
+	/**
+	 * @return string
+	 */
+	private function format($s, $testCase, $e)
+	{
+		return "\n-- $s: {$testCase->getName()}"
+			. ($testCase->getArguments() ? " [{$testCase->getArguments()}]" : '') . ' | '
+			. implode(DIRECTORY_SEPARATOR, array_slice(explode(DIRECTORY_SEPARATOR, $testCase->getFile()), -3))
+			. str_replace("\n", "\n   ", "\n" . trim($e->getMessage())) . "\n";
 	}
 
 }
