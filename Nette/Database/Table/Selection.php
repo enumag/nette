@@ -25,6 +25,8 @@ use Nette,
  * @author     Jan Skrasek
  *
  * @property-read string $sql
+ * @property-read string $name
+ * @property-read string $primary
  */
 class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Countable
 {
