@@ -187,6 +187,16 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 
 	/**
+	 * @return array
+	 */
+	public function getKeys()
+	{
+		return $this->keys;
+	}
+
+
+
+	/**
 	 * Loads cache of previous accessed columns and returns it.
 	 * @internal
 	 * @return array|false
@@ -514,6 +524,13 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 
 
+	protected function createGroupedManySelectionInstance($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget)
+	{
+		return new GroupedManySelection($this, $joinTable, $joinColumnSource, $targetTable, $joinColumnTarget);
+	}
+
+
+
 	protected function query($query)
 	{
 		return $this->connection->queryArgs($query, $this->sqlBuilder->getParameters());
@@ -717,6 +734,29 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 		if (!$prototype) {
 			$prototype = $this->createGroupedSelectionInstance($table, $column);
 			$prototype->where("$table.$column", array_keys((array) $this->rows));
+		}
+
+		$clone = clone $prototype;
+		$clone->setActive($active);
+		return $clone;
+	}
+
+
+
+	/**
+	 * Returns referenced rows of M:N relation.
+	 * @param  string
+	 * @param  string
+	 * @param  string
+	 * @param  string
+	 * @param  int primary key
+	 * @return GroupedManySelection
+	 */
+	public function getReferencedMany($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $active = NULL)
+	{
+		$prototype = & $this->getRefTable($refPath)->referencingPrototype[$refPath . "$joinTable.$joinColumnSource.$targetTable.$joinColumnTarget"];
+		if (!$prototype) {
+			$prototype = $this->createGroupedManySelectionInstance($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget);
 		}
 
 		$clone = clone $prototype;

@@ -5,6 +5,7 @@
  *
  * @author     Jakub Vrana
  * @author     Jan Skrasek
+ * @author     Jachym Tousek
  * @package    Nette\Database
  * @multiple   databases.ini
  */
@@ -18,18 +19,21 @@ Nette\Database\Helpers::loadFromFile($connection, __DIR__ . "/{$driverName}-nett
 $count = $connection->table('book')->count('*');  // SELECT COUNT(*) FROM `book`
 Assert::same(4, $count);
 
-$tags = array();
+$tags1 = $tags2 = array();
 foreach ($connection->table('book') as $book) {  // SELECT * FROM `book`
-	$count = $book->related('book_tag')->count('*');  // SELECT COUNT(*), `book_id` FROM `book_tag` WHERE (`book_tag`.`book_id` IN (1, 2, 3, 4)) GROUP BY `book_id`
-	$tags[$book->title] = $count;
+	$tags1[$book->title] = $book->related('book_tag')->count('*');  // SELECT COUNT(*), `book_id` FROM `book_tag` WHERE (`book_tag`.`book_id` IN (1, 2, 3, 4)) GROUP BY `book_id`
+	$tags2[$book->title] = $book->relatedMany('book_tag:tag')->count('*'); // SELECT COUNT(*), `book_tag`.`book_id` AS `_nette_relation_source` FROM `tag` INNER JOIN `book_tag` ON `tag`.`id` = `book_tag`.`tag_id` WHERE (`book_tag`.`book_id` IN (1, 2, 3, 4)) GROUP BY `book_tag`.`book_id`
 }
 
-Assert::same(array(
+$expectedTags = array(
 	'1001 tipu a triku pro PHP' => 2,
 	'JUSH' => 1,
 	'Nette' => 1,
 	'Dibi' => 2,
-), $tags);
+);
+
+Assert::same($expectedTags, $tags1);
+Assert::same($expectedTags, $tags2);
 
 
 
