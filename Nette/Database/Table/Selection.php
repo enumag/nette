@@ -25,6 +25,8 @@ use Nette,
  * @author     Jan Skrasek
  *
  * @property-read string $sql
+ * @property-read string $name
+ * @property-read string $primary
  */
 class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Countable
 {
@@ -512,6 +514,13 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 
 
+	protected function createGroupedManySelectionInstance($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $mapping)
+	{
+		return new GroupedManySelection($this, $joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $mapping);
+	}
+
+
+
 	protected function query($query)
 	{
 		return $this->connection->queryArgs($query, $this->sqlBuilder->getParameters());
@@ -715,6 +724,37 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 		if (!$prototype) {
 			$prototype = $this->createGroupedSelectionInstance($table, $column);
 			$prototype->where("$table.$column", array_keys((array) $this->rows));
+		}
+
+		$clone = clone $prototype;
+		$clone->setActive($active);
+		return $clone;
+	}
+
+
+
+	/**
+	 * Returns referenced rows of M:N relation.
+	 * @param  string
+	 * @param  string
+	 * @param  string
+	 * @param  string
+	 * @param  int primary key
+	 * @return GroupedManySelection
+	 */
+	public function getReferencedMany($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $active = NULL)
+	{
+		$prototype = & $this->getRefTable($refPath)->referencingPrototype[$refPath . "$joinTable.$joinColumnSource.$targetTable.$joinColumnTarget"];
+		if (!$prototype) {
+			$join = $this->connection->table($joinTable)->where("$joinTable.$joinColumnSource", array_keys((array) $this->rows));
+
+			$mapping = array();
+			foreach($join as $row) {
+				$mapping[$row->$joinColumnTarget][] = $row->$joinColumnSource;
+			}
+
+			$prototype = $this->createGroupedManySelectionInstance($joinTable, $joinColumnSource, $targetTable, $joinColumnTarget, $mapping);
+			$prototype->where("$targetTable.{$prototype->primary}", array_keys($mapping));
 		}
 
 		$clone = clone $prototype;
