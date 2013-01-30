@@ -247,7 +247,7 @@ class User extends Nette\Object
 	 */
 	public function isAllowed($resource = IAuthorizator::ALL, $privilege = IAuthorizator::ALL)
 	{
-		return $this->getAuthorizator()->isAllowed($this->getIdentity(), $resource, $privilege);
+		return $this->getAuthorizator()->isAllowed($this->isLoggedIn() ? $this->getIdentity() : NULL, $resource, $privilege);
 	}
 
 
