@@ -35,12 +35,6 @@ class User extends Nette\Object
 		INACTIVITY = IUserStorage::INACTIVITY,
 		BROWSER_CLOSED = IUserStorage::BROWSER_CLOSED;/**/
 
-	/** @var string  default role for unauthenticated user */
-	public $guestRole = 'guest';
-
-	/** @var string  default role for authenticated user without own identity */
-	public $authenticatedRole = 'authenticated';
-
 	/** @var array of function(User $sender); Occurs when the user is successfully logged in */
 	public $onLoggedIn;
 
@@ -139,7 +133,7 @@ class User extends Nette\Object
 	 */
 	final public function getIdentity()
 	{
-		return $this->storage->getIdentity();
+		return $this->isLoggedIn() ? $this->storage->getIdentity() : NULL;
 	}
 
 
@@ -216,12 +210,8 @@ class User extends Nette\Object
 	 */
 	public function getRoles()
 	{
-		if (!$this->isLoggedIn()) {
-			return array($this->guestRole);
-		}
-
 		$identity = $this->getIdentity();
-		return $identity && $identity->getRoles() ? $identity->getRoles() : array($this->authenticatedRole);
+		return $identity ? $identity->getRoles() : array();
 	}
 
 
