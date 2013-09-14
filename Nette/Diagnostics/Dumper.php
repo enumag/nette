@@ -172,7 +172,7 @@ class Dumper
 			return $out . (count($var) - 1) . ") [ <i>RECURSION</i> ]\n";
 
 		} elseif (!$options[self::DEPTH] || $level < $options[self::DEPTH]) {
-			$collapsed = $level ? count($var) >= $options[self::COLLAPSE_COUNT] || $level >= $options[self::COLLAPSE_LEVEL] : $options[self::COLLAPSE];
+			$collapsed = count($var) >= $options[self::COLLAPSE_COUNT] || $level >= $options[self::COLLAPSE_LEVEL] || $options[self::COLLAPSE];
 			$out = '<span class="nette-toggle' . ($collapsed ? '-collapsed' : '') . '">' . $out . count($var) . ")</span>\n<div" . ($collapsed ? ' class="nette-collapsed"' : '') . '>';
 			$var[$marker] = TRUE;
 			foreach ($var as $k => & $v) {
@@ -224,7 +224,7 @@ class Dumper
 			return $out . " { <i>RECURSION</i> }\n";
 
 		} elseif (!$options[self::DEPTH] || $level < $options[self::DEPTH] || $var instanceof \Closure) {
-			$collapsed = $level ? count($fields) >= $options[self::COLLAPSE_COUNT] || $level >= $options[self::COLLAPSE_LEVEL] : $options[self::COLLAPSE];
+			$collapsed = count($fields) >= $options[self::COLLAPSE_COUNT] || $level >= $options[self::COLLAPSE_LEVEL] || $options[self::COLLAPSE];
 			$out = '<span class="nette-toggle' . ($collapsed ? '-collapsed' : '') . '">' . $out . "</span>\n<div" . ($collapsed ? ' class="nette-collapsed"' : '') . '>';
 			$list[] = $var;
 			foreach ($fields as $k => & $v) {
