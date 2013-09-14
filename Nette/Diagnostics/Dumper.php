@@ -27,7 +27,8 @@ class Dumper
 		COLLAPSE_COUNT = 'collapsecount', // how big array/object are collapsed? (defaults to 7)
 		COLLAPSE_LEVEL = 'collapselevel', // how deep levels are collapsed? (defaults to 2)
 		CLASS_LOCATION = 'classlocation', // show class location link (defaults to true for HTML mode, false for text and terminal)
-		LOCATION = 'location'; // show location string? (defaults to false)
+		LOCATION = 'location', // show location string? (defaults to false)
+		LOCATION_LEVEL = 'locationlevel'; // backtrace level where the location is searched for
 
 	/** @var array */
 	public static $terminalColors = array(
@@ -77,9 +78,10 @@ class Dumper
 			self::COLLAPSE_COUNT => 7,
 			self::COLLAPSE_LEVEL => 2,
 			self::LOCATION => FALSE,
+			self::LOCATION_LEVEL => 2,
 			self::CLASS_LOCATION => TRUE,
 		);
-		list($file, $line, $code) = $options[self::LOCATION] ? self::findLocation() : NULL;
+		list($file, $line, $code) = $options[self::LOCATION] ? self::findLocation($options[self::LOCATION_LEVEL]) : NULL;
 		return '<pre class="nette-dump"'
 			. ($file ? ' title="' . htmlspecialchars("$code\nin file $file on line $line", ENT_IGNORE | ENT_QUOTES) . '">' : '>')
 			. self::dumpVar($var, $options)
@@ -300,10 +302,11 @@ class Dumper
 	 * Finds the location where dump was called.
 	 * @return array [file, line, code]
 	 */
-	private static function findLocation()
+	private static function findLocation($level)
 	{
+		$i = 0;
 		foreach (debug_backtrace(PHP_VERSION_ID >= 50306 ? DEBUG_BACKTRACE_IGNORE_ARGS : FALSE) as $item) {
-			if (isset($item['file']) && strpos($item['file'], __DIR__) === 0) {
+			if (++$i <= $level) {
 				continue;
 
 			} elseif (!isset($item['file'], $item['line']) || !is_file($item['file'])) {

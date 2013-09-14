@@ -624,6 +624,7 @@ final class Debugger
 		if (!self::$productionMode) {
 			self::getBar()->getPanel(__CLASS__ . ':dumps')->data[] = array('title' => $title, 'dump' => Dumper::toHtml($var, $options + array(
 				Dumper::LOCATION => TRUE,
+				Dumper::LOCATION_LEVEL => 2,
 			)));
 		}
 		return $var;
