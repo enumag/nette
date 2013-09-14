@@ -26,6 +26,7 @@ class Dumper
 		COLLAPSE = 'collapse', // always collapse? (defaults to false)
 		COLLAPSE_COUNT = 'collapsecount', // how big array/object are collapsed? (defaults to 7)
 		COLLAPSE_LEVEL = 'collapselevel', // how deep levels are collapsed? (defaults to 2)
+		CLASS_LOCATION = 'classlocation', // show class location link (defaults to true for HTML mode, false for text and terminal)
 		LOCATION = 'location'; // show location string? (defaults to false)
 
 	/** @var array */
@@ -78,6 +79,7 @@ class Dumper
 				self::COLLAPSE => FALSE,
 				self::COLLAPSE_COUNT => 7,
 				self::COLLAPSE_LEVEL => 2,
+				self::CLASS_LOCATION => TRUE,
 			))
 			. ($file ? '<small>in <a href="editor://open/?file=' . rawurlencode($file) . "&amp;line=$line\">" . htmlspecialchars($file, ENT_IGNORE) . ":$line</a></small>" : '')
 			. "</pre>\n";
@@ -90,6 +92,9 @@ class Dumper
 	 */
 	public static function toText($var, array $options = NULL)
 	{
+		$options = (array) $options + array(
+			self::CLASS_LOCATION => FALSE,
+		);
 		return htmlspecialchars_decode(strip_tags(self::toHtml($var, $options)), ENT_QUOTES);
 	}
 
@@ -100,6 +105,9 @@ class Dumper
 	 */
 	public static function toTerminal($var, array $options = NULL)
 	{
+		$options = (array) $options + array(
+			self::CLASS_LOCATION => FALSE,
+		);
 		return htmlspecialchars_decode(strip_tags(preg_replace_callback('#<span class="nette-dump-(\w+)">|</span>#', function($m) {
 			return "\033[" . (isset($m[1], Dumper::$terminalColors[$m[1]]) ? Dumper::$terminalColors[$m[1]] : '0') . "m";
 		}, self::toHtml($var, $options))), ENT_QUOTES);
@@ -215,17 +223,21 @@ class Dumper
 		}
 
 		static $list = array();
+		$reflection = new \ReflectionClass($var);
+		$file = $reflection->getFileName();
+		$line = $reflection->getStartLine();
+		$link = $options[self::CLASS_LOCATION] && $file ? '<a href="editor://open/?file=' . rawurlencode($file) . "&amp;line=$line\" title=\"See source code\">$</a> " : '';
 		$out = '<span class="nette-dump-object">' . get_class($var) . '</span> <span class="nette-dump-hash">#' . substr(md5(spl_object_hash($var)), 0, 4) . '</span>';
 
 		if (empty($fields)) {
-			return $out . "\n";
+			return $link . $out . "\n";
 
 		} elseif (in_array($var, $list, TRUE)) {
-			return $out . " { <i>RECURSION</i> }\n";
+			return $link . $out . " { <i>RECURSION</i> }\n";
 
 		} elseif (!$options[self::DEPTH] || $level < $options[self::DEPTH] || $var instanceof \Closure) {
 			$collapsed = count($fields) >= $options[self::COLLAPSE_COUNT] || $level >= $options[self::COLLAPSE_LEVEL] || $options[self::COLLAPSE];
-			$out = '<span class="nette-toggle' . ($collapsed ? '-collapsed' : '') . '">' . $out . "</span>\n<div" . ($collapsed ? ' class="nette-collapsed"' : '') . '>';
+			$out = $link . '<span class="nette-toggle' . ($collapsed ? '-collapsed' : '') . '">' . $out . "</span>\n<div" . ($collapsed ? ' class="nette-collapsed"' : '') . '>';
 			$list[] = $var;
 			foreach ($fields as $k => & $v) {
 				$vis = '';
@@ -241,7 +253,7 @@ class Dumper
 			return $out . '</div>';
 
 		} else {
-			return $out . " { ... }\n";
+			return $link . $out . " { ... }\n";
 		}
 	}
 
