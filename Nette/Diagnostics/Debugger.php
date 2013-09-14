@@ -622,7 +622,9 @@ final class Debugger
 	public static function barDump($var, $title = NULL, array $options = NULL)
 	{
 		if (!self::$productionMode) {
-			self::getBar()->getPanel(__CLASS__ . ':dumps')->data[] = array('title' => $title, 'dump' => Dumper::toHtml($var));
+			self::getBar()->getPanel(__CLASS__ . ':dumps')->data[] = array('title' => $title, 'dump' => Dumper::toHtml($var, $options + array(
+				Dumper::LOCATION => TRUE,
+			)));
 		}
 		return $var;
 	}
