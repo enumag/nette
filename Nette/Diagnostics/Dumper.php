@@ -28,7 +28,7 @@ class Dumper
 		COLLAPSE_LEVEL = 'collapselevel', // how deep levels are collapsed? (defaults to 2)
 		CLASS_LOCATION = 'classlocation', // show class location link (defaults to true for HTML mode, false for text and terminal)
 		LOCATION = 'location', // show location string? (defaults to false)
-		LOCATION_LEVEL = 'locationlevel'; // backtrace level where the location is searched for
+		LOCATION_LEVEL = 'locationlevel'; // backtrace level where the location is searched for, NULL means first file outside of __DIR__ (default to NULL)
 
 	/** @var array */
 	public static $terminalColors = array(
@@ -78,7 +78,7 @@ class Dumper
 			self::COLLAPSE_COUNT => 7,
 			self::COLLAPSE_LEVEL => 2,
 			self::LOCATION => FALSE,
-			self::LOCATION_LEVEL => 2,
+			self::LOCATION_LEVEL => NULL,
 			self::CLASS_LOCATION => TRUE,
 		);
 		list($file, $line, $code) = $options[self::LOCATION] ? self::findLocation($options[self::LOCATION_LEVEL]) : NULL;
@@ -306,7 +306,7 @@ class Dumper
 	{
 		$i = 0;
 		foreach (debug_backtrace(PHP_VERSION_ID >= 50306 ? DEBUG_BACKTRACE_IGNORE_ARGS : FALSE) as $item) {
-			if (++$i <= $level) {
+			if (($level === NULL && isset($item['file']) && strpos($item['file'], __DIR__) === 0) || ($level !== NULL && ++$i <= $level)) {
 				continue;
 
 			} elseif (!isset($item['file'], $item['line']) || !is_file($item['file'])) {
@@ -318,7 +318,7 @@ class Dumper
 				return array(
 					$item['file'],
 					$item['line'],
-					preg_match('#\w*dump(er::\w+)?\(.*\)#i', $line, $m) ? $m[0] : trim($line)
+					preg_match('#\w*dump(er::\w+)?\(.*\)#i', $line, $m) ? $m[0] : $line
 				);
 			}
 		}
