@@ -31,6 +31,10 @@ pre.nette-dump {
 	background: white;
 }
 
+pre.nette-dump a {
+	text-decoration: none;
+}
+
 pre.nette-dump div {
 	padding-left: 3ex;
 }
