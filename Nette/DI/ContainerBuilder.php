@@ -243,6 +243,9 @@ class ContainerBuilder extends Nette\Object
 							}
 							$ctorParams[$name] = $param;
 						}
+						if ($def->factory->entity === 'Bad6') {
+							throw new ServiceCreationException(var_export($ctor->getParameters(), TRUE));
+						}
 					}
 				}
 				foreach ($method->getParameters() as $param) {
