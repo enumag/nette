@@ -232,8 +232,28 @@ class ContainerBuilder extends Nette\Object
 			}
 
 			if (!$def->parameters) {
+				$ctorParams = array();
+				if ($def->factory && !$def->factory->arguments && $def->factory->entity[0] !== '@') {
+					$ctor = Nette\Reflection\ClassType::from($def->factory->entity)->getConstructor();
+					if ($ctor) {
+						foreach ($ctor->getParameters() as $param) {
+							$name = $param->getName();
+							if (isset($ctorParams[$name])) {
+								throw new ServiceCreationException("The constuctor of '{$def->factory->entity}' has two parameters with the name '$name'.");
+							}
+							$ctorParams[$name] = $param;
+						}
+					}
+				}
 				foreach ($method->getParameters() as $param) {
 					$paramDef = ($param->isArray() ? 'array' : $param->getClassName()) . ' ' . $param->getName();
+					if (isset($ctorParams[$param->getName()])) {
+						$arg = $ctorParams[$param->getName()];
+						if (($param->getClassName() || $arg->getClassName()) && $param->getClassName() !== $arg->getClassName()) {
+							throw new ServiceCreationException("Argument '$arg' type hint doesn't match '" . $param->getClassName() . "' type hint.");
+						}
+						$def->factory->arguments[$arg->getPosition()] = ContainerBuilder::literal('$' . $arg->getName());
+					}
 					if ($param->isOptional()) {
 						$def->parameters[$paramDef] = $param->getDefaultValue();
 					} else {
